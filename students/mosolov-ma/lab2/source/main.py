@@ -24,63 +24,88 @@ logger.addHandler(handler)
 
 class RandomForest:
     def __init__(self, n_estimators=100, max_features='sqrt', max_depth=None,
-                 min_samples_split=2, random_state=None):
+                 min_samples_split=2, random_state=None, oob_selection=True):
         self.n_estimators = n_estimators
         self.max_features = max_features
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.random_state = random_state
+        self.oob_selection = oob_selection
         self.trees = []
-        self.feature_subsets = []
         self.oob_indices_ = []
+        self.tree_oob_scores_ = []
+        self.selected_tree_indices_ = []
         self.X_train = None
         self.y_train = None
 
     def fit(self, X, y):
         self.X_train = X.copy()
         self.y_train = y.copy()
-        n_samples, n_features = X.shape
+        n_samples = X.shape[0]
         rng = np.random.default_rng(self.random_state)
 
-        if self.max_features == 'sqrt':
-            max_feat = int(np.sqrt(n_features))
-        elif self.max_features == 'log2':
-            max_feat = int(np.log2(n_features))
-        elif isinstance(self.max_features, int):
-            max_feat = self.max_features
-        else:
-            max_feat = n_features
-
         self.trees = []
-        self.feature_subsets = []
         self.oob_indices_ = []
+        self.tree_oob_scores_ = []
+        all_trees = []
+        all_oob_indices = []
+        all_tree_oob_scores = []
 
         for i in range(self.n_estimators):
             boot_idx = rng.choice(n_samples, size=n_samples, replace=True)
             oob_idx = np.setdiff1d(np.arange(n_samples), np.unique(boot_idx))
-            self.oob_indices_.append(oob_idx)
-
-            feat_idx = rng.choice(n_features, size=max_feat, replace=False)
-            feat_idx.sort()
-            self.feature_subsets.append(feat_idx)
 
             tree = DecisionTreeClassifier(
                 max_depth=self.max_depth,
                 min_samples_split=self.min_samples_split,
+                max_features=self.max_features,
                 random_state=int(rng.integers(0, 2**31))
             )
-            tree.fit(X[np.ix_(boot_idx, feat_idx)], y[boot_idx])
-            self.trees.append(tree)
+            tree.fit(X[boot_idx], y[boot_idx])
+
+            tree_oob_score = np.nan
+            if len(oob_idx) > 0:
+                tree_oob_score = accuracy_score(y[oob_idx], tree.predict(X[oob_idx]))
+
+            all_trees.append(tree)
+            all_oob_indices.append(oob_idx)
+            all_tree_oob_scores.append(tree_oob_score)
+
+        if self.oob_selection:
+            valid_scores = np.array([score for score in all_tree_oob_scores if not np.isnan(score)])
+            if valid_scores.size > 0:
+                threshold = float(valid_scores.mean())
+                selected_indices = [
+                    i for i, score in enumerate(all_tree_oob_scores)
+                    if not np.isnan(score) and score >= threshold
+                ]
+                if len(selected_indices) == 0:
+                    selected_indices = [
+                        i for i, score in enumerate(all_tree_oob_scores)
+                        if not np.isnan(score)
+                    ]
+            else:
+                selected_indices = list(range(len(all_trees)))
+        else:
+            selected_indices = list(range(len(all_trees)))
+
+        if len(selected_indices) == 0:
+            selected_indices = list(range(len(all_trees)))
+
+        self.selected_tree_indices_ = selected_indices
+        self.trees = [all_trees[i] for i in selected_indices]
+        self.oob_indices_ = [all_oob_indices[i] for i in selected_indices]
+        self.tree_oob_scores_ = [all_tree_oob_scores[i] for i in selected_indices]
+        return self
 
     def oob_score(self):
         n_samples = self.X_train.shape[0]
         oob_sum = np.zeros(n_samples)
         oob_count = np.zeros(n_samples)
 
-        for i, (tree, feat_idx, oob_idx) in enumerate(
-                zip(self.trees, self.feature_subsets, self.oob_indices_)):
+        for tree, oob_idx in zip(self.trees, self.oob_indices_):
             if len(oob_idx) > 0:
-                preds = tree.predict(self.X_train[np.ix_(oob_idx, feat_idx)])
+                preds = tree.predict(self.X_train[oob_idx])
                 oob_sum[oob_idx] += preds
                 oob_count[oob_idx] += 1
 
@@ -91,9 +116,9 @@ class RandomForest:
         return accuracy_score(self.y_train[valid], oob_pred)
 
     def predict(self, X):
-        predictions = np.zeros((X.shape[0], self.n_estimators))
-        for i, (tree, feat_idx) in enumerate(zip(self.trees, self.feature_subsets)):
-            predictions[:, i] = tree.predict(X[:, feat_idx])
+        predictions = np.zeros((X.shape[0], len(self.trees)))
+        for i, tree in enumerate(self.trees):
+            predictions[:, i] = tree.predict(X)
         return np.round(np.mean(predictions, axis=1)).astype(int)
 
     def feature_importance_oob(self):
@@ -101,10 +126,9 @@ class RandomForest:
         oob_sum = np.zeros(n_samples)
         oob_count = np.zeros(n_samples)
 
-        for tree, feat_idx, oob_idx in zip(
-                self.trees, self.feature_subsets, self.oob_indices_):
+        for tree, oob_idx in zip(self.trees, self.oob_indices_):
             if len(oob_idx) > 0:
-                oob_sum[oob_idx] += tree.predict(self.X_train[np.ix_(oob_idx, feat_idx)])
+                oob_sum[oob_idx] += tree.predict(self.X_train[oob_idx])
                 oob_count[oob_idx] += 1
 
         valid = oob_count > 0
@@ -122,10 +146,9 @@ class RandomForest:
 
             perm_sum = np.zeros(n_samples)
             perm_count = np.zeros(n_samples)
-            for tree, feat_idx, oob_idx in zip(
-                    self.trees, self.feature_subsets, self.oob_indices_):
+            for tree, oob_idx in zip(self.trees, self.oob_indices_):
                 if len(oob_idx) > 0:
-                    perm_sum[oob_idx] += tree.predict(X_perm[np.ix_(oob_idx, feat_idx)])
+                    perm_sum[oob_idx] += tree.predict(X_perm[oob_idx])
                     perm_count[oob_idx] += 1
 
             perm_pred = np.round(perm_sum[valid] / perm_count[valid]).astype(int)
