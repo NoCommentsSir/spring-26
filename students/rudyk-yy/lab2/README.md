@@ -55,52 +55,54 @@
 
 Результаты подбора:
 
-- best params: `{'n_estimators': 50, 'max_depth': None, 'max_features': 'sqrt', 'min_samples_split': 2}`
-- best OOB score: 0.9523
+- best params: `{'n_estimators': 100, 'max_depth': None, 'max_features': 'log2', 'min_samples_split': 10}`
+- best OOB score: 0.9548
+- test accuracy с лучшими параметрами: 0.9825
 - total combinations: 72
-####  Top 10 Combinations
+#### Top 10 Combinations
 
 | Rank | Score  | n_estimators | max_depth | max_features | min_samples_split |
-|------|--------|--------------|------------|---------------|-------------------|
-| 1    | 0.9523 | 50           | None       | sqrt          | 2                 |
-| 2    | 0.9523 | 50           | 20         | sqrt          | 2                 |
-| 3    | 0.9523 | 1000         | None       | sqrt          | 10                |
-| 4    | 0.9523 | 1000         | 10         | sqrt          | 10                |
-| 5    | 0.9523 | 1000         | 20         | sqrt          | 10                |
-| 6    | 0.9497 | 50           | None       | sqrt          | 5                 |
-| 7    | 0.9497 | 50           | 10         | sqrt          | 2                 |
-| 8    | 0.9497 | 50           | 10         | sqrt          | 5                 |
-| 9    | 0.9497 | 50           | 20         | sqrt          | 5                 |
-| 10   | 0.9497 | 100          | None       | sqrt          | 5                 |
+|------|--------|--------------|-----------|--------------|-------------------|
+| 1    | 0.9548 | 100          | None      | log2         | 10                |
+| 2    | 0.9548 | 100          | 10        | log2         | 10                |
+| 3    | 0.9548 | 100          | 20        | log2         | 10                |
+| 4    | 0.9523 | 50           | None      | log2         | 5                 |
+| 5    | 0.9523 | 50           | 10        | log2         | 5                 |
+| 6    | 0.9523 | 50           | 20        | log2         | 5                 |
+| 7    | 0.9523 | 1000         | None      | log2         | 2                 |
+| 8    | 0.9523 | 1000         | 10        | log2         | 2                 |
+| 9    | 0.9523 | 1000         | 20        | log2         | 2                 |
+| 10   | 0.9497 | 50           | None      | log2         | 10                |
 
 ### 4. Важность признаков через OOB^j
 
 Важность считалась как падение OOB-score после перестановки значений каждого признака.
 
 Топ признаков:
-| Признак | OOB importance |
-|---|---|
-worst concave points |0.4286
-worst concavity |0.2857
-radius error |0.1429
-worst compactness |0.1429
-worst fractal dimension |0.1429
-mean area |0.0714
-mean concavity |0.0714
-mean fractal dimension |0.0714
-perimeter error |0.0714
-compactness error |0.0714
+
+| Признак                | OOB importance |
+|------------------------|---------------|
+| worst perimeter        | 0.6053        |
+| worst texture          | 0.0921        |
+| worst symmetry         | 0.0658        |
+| mean concave points    | 0.0526        |
+| worst radius           | 0.0526        |
+| worst concave points   | 0.0395        |
+| mean compactness       | 0.0263        |
+| mean concavity         | 0.0263        |
+| mean texture           | 0.0132        |
+| mean smoothness        | 0.0132        |
 
 
 ### 5. Сравнение с sklearn
 
 Сравнение проводилось с `sklearn.ensemble.RandomForestClassifier` на том же разбиении.
 
-| Метрика | Моя реализация | sklearn |
-|---|---|---|
-| Accuracy (test) | 0.9708 | 0.9708 |
-| Fit time (sec) | 0.0485 | 0.0484 |
-| Speed ratio (mine/sklearn) | 1.0021 | - |
+| Метрика                    | Моя реализация | sklearn |
+|----------------------------|---------------|---------|
+| Accuracy (test)            | 0.9708        | 0.9708  |
+| Fit time (sec)             | 0.0579        | 0.0464  |
+| Speed ratio (mine/sklearn) | 1.25x         | —       |
 
 ### 6. Файлы проекта
 
