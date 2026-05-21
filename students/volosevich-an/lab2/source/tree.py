@@ -29,10 +29,33 @@ class Node:
 
 class ID3Tree:
 
-    def __init__(self, max_depth: int = 10, min_samples: int = 5):
+    def __init__(
+        self, 
+        max_depth: int = 10, 
+        min_samples: int = 5,
+        max_features: str | int | None = None,
+        rng: np.random.Generator | None = None
+    ):
         self.max_depth = max_depth
         self.min_samples = min_samples
+        self.max_features = max_features
+        self.rng = rng or np.random.default_rng()
         self.root: Node | None = None
+
+    def _get_feature_subset(self, n_features: int) -> np.ndarray:
+        if self.max_features is None:
+            return np.arange(n_features)
+        elif self.max_features == "sqrt":
+            k = int(np.sqrt(n_features))
+        elif self.max_features == "log2":
+            k = int(np.log2(n_features))
+        elif isinstance(self.max_features, int):
+            k = min(self.max_features, n_features)
+        else:
+            k = n_features
+        
+        k = max(1, k)
+        return self.rng.choice(n_features, size=k, replace=False)
 
     def gini(self, y: np.ndarray) -> float:
         _, counts = np.unique(y, return_counts=True)
@@ -96,8 +119,11 @@ class ID3Tree:
         best_right_prob = 0.5
 
         n_features = X.shape[1]
+        
+        # Подвыборка признаков для случайного леса
+        feature_subset = self._get_feature_subset(n_features)
 
-        for f in range(n_features):
+        for f in feature_subset:
             col = X[:, f]
             valid = col[~np.isnan(col)]
             if len(valid) == 0:

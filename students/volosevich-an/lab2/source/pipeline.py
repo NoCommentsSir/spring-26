@@ -2,7 +2,7 @@
 import time
 import pandas as pd
 
-from core import RandomForest, compute_oob_importance
+from core import RandomForest
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
@@ -57,7 +57,7 @@ print("BEST CONFIGURATION:", best_params, best_score)
 
 
 # %%
-importances = compute_oob_importance(best_model, X_train, y_train)
+importances = RandomForestcompute_oob_importance(best_model, X_train, y_train)
 
 print("Feature importance:")
 print(importances)
